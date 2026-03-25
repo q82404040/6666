@@ -3,74 +3,21 @@
 <head>
 <meta charset="utf-8">
 <style>
-body{
-margin:0;
-display:flex;
-height:100vh;
-background:#1e1e1e;
-font-family:sans-serif;
-}
+body{margin:0;display:flex;height:100vh;background:#1e1e1e;font-family:sans-serif}
 
-.panel{
-width:300px;
-background:#2b2b2b;
-padding:10px;
-color:#fff;
-overflow:auto;
-}
+.panel{width:280px;background:#2b2b2b;padding:10px;color:#fff}
+.btn{width:100%;padding:8px;margin:4px 0;background:#444;border:none;color:#fff;border-radius:6px}
 
-.btn{
-width:100%;
-padding:8px;
-margin:4px 0;
-background:#444;
-border:none;
-color:#fff;
-border-radius:6px;
-cursor:pointer;
-}
-
-textarea{
-width:100%;
-margin-top:5px;
-background:#222;
-color:#fff;
-border:1px solid #555;
-}
-
-.palette{
-display:flex;
-gap:6px;
-margin:6px 0;
-}
-
-.color{
-width:20px;
-height:20px;
-border-radius:4px;
-cursor:pointer;
-border:2px solid #666;
-}
-
-.canvasBox{
-flex:1;
-display:flex;
-align-items:center;
-justify-content:center;
-}
+.canvasBox{flex:1;display:flex;align-items:center;justify-content:center}
 </style>
 </head>
 
 <body>
 
 <div class="panel">
-<h3>陆压罗盘</h3>
-
-<button class="btn" onclick="addLayer()">➕ 添加层</button>
-
-<div id="layersUI"></div>
-
-<button class="btn" onclick="exportPNG()">导出透明PNG</button>
+<h3>商业罗盘工具</h3>
+<button class="btn" onclick="addLayer()">添加层</button>
+<button class="btn" onclick="exportPNG()">导出</button>
 </div>
 
 <div class="canvasBox">
@@ -83,184 +30,158 @@ const x=c.getContext("2d")
 c.width=900
 c.height=900
 
-const palette=["#000","#c0392b","#2980b9","#27ae60","#f39c12","#8e44ad"]
-
 let scale=1
 let rotation=0
+let offsetX=0
+let offsetY=0
 
 let dragging=false
-let lastAngle=0
+let rotating=false
+
+let selected=null
 
 let state={
 layers:[
-{n:8,data:"乾,兑,离,震,巽,坎,艮,坤",size:18,color:"#000",w:60},
-{n:24,data:"子,癸,丑,艮,寅,甲,卯,乙,辰,巽,巳,丙,午,丁,未,坤,申,庚,酉,辛,戌,乾,亥,壬",size:12,color:"#000",w:50}
+{n:8,data:"乾,兑,离,震,巽,坎,艮,坤",w:60},
+{n:24,data:"子,癸,丑,艮,寅,甲,卯,乙,辰,巽,巳,丙,午,丁,未,坤,申,庚,酉,辛,戌,乾,亥,壬",w:50}
 ]
 }
 
-// ===== UI =====
-function buildUI(){
-let box=document.getElementById("layersUI")
-box.innerHTML=""
-
-state.layers.forEach((l,i)=>{
-let colorsHTML=""
-palette.forEach(col=>{
-colorsHTML+=`<div class="color" style="background:${col}" onclick="setColor(${i},'${col}')"></div>`
-})
-
-box.innerHTML+=`
-<div style="background:#333;padding:8px;margin:8px 0;border-radius:6px">
-<b>第${i+1}层</b>
-<button onclick="removeLayer(${i})" style="float:right">✖</button>
-
-<br>分割
-<input value="${l.n}" onchange="updateLayer(${i},'n',this.value)">
-
-<br>厚度
-<input value="${l.w}" onchange="updateLayer(${i},'w',this.value)">
-
-<div class="palette">${colorsHTML}</div>
-
-<textarea onchange="updateLayer(${i},'data',this.value)">${l.data}</textarea>
-</div>
-`
-})
-}
-
-function updateLayer(i,key,val){
-state.layers[i][key] = key==="data" ? val : Number(val)
-}
-
-function setColor(i,col){
-state.layers[i].color = col
-}
-
 function addLayer(){
-state.layers.push({n:12,data:"",size:12,color:"#000",w:50})
-buildUI()
+state.layers.push({n:12,data:"",w:50})
 }
 
-function removeLayer(i){
-state.layers.splice(i,1)
-buildUI()
-}
-
-buildUI()
-
-// ===== 缩放（中心）=====
+// ===== 缩放 =====
 c.onwheel=e=>{
 e.preventDefault()
 scale *= e.deltaY<0 ? 1.1 : 0.9
 }
 
-// ===== 旋转 =====
+// ===== 鼠标 =====
 c.onmousedown=e=>{
+if(e.button===2){
+rotating=true
+}else{
 dragging=true
-lastAngle=Math.atan2(e.offsetY-450,e.offsetX-450)
 }
-
-window.onmouseup=()=>dragging=false
+}
+window.onmouseup=()=>{dragging=false;rotating=false}
 
 window.onmousemove=e=>{
-if(!dragging)return
-let a=Math.atan2(e.offsetY-450,e.offsetX-450)
-rotation += a - lastAngle
-lastAngle = a
+if(dragging){
+offsetX += e.movementX
+offsetY += e.movementY
+}
+if(rotating){
+rotation += e.movementX*0.01
+}
+}
+
+// ===== 点击选中 =====
+c.onclick=e=>{
+let dx=e.offsetX-450-offsetX
+let dy=e.offsetY-450-offsetY
+let dist=Math.sqrt(dx*dx+dy*dy)
+
+let angle=Math.atan2(dy,dx)+Math.PI/2
+if(angle<0) angle+=Math.PI*2
+
+let inner=80
+
+state.layers.forEach((l,li)=>{
+let outer=inner+l.w
+if(dist>inner*scale && dist<outer*scale){
+let step=2*Math.PI/l.n
+let index=Math.floor(angle/step)
+selected={layer:li,index}
+}
+inner=outer
+})
 }
 
 // ===== 绘制 =====
-function drawCompass(ctx,transparent=false){
+function draw(){
+requestAnimationFrame(draw)
 
-if(!transparent){
-ctx.fillStyle="#ffffff"
-ctx.fillRect(0,0,900,900)
+x.clearRect(0,0,900,900)
+
+// 白底
+x.fillStyle="#fff"
+x.fillRect(0,0,900,900)
+
+x.save()
+
+x.translate(450+offsetX,450+offsetY)
+x.scale(scale,scale)
+x.rotate(rotation)
+
+// ===== 刻度环 =====
+for(let i=0;i<360;i+=10){
+let a=i*Math.PI/180
+let r1=350
+let r2=i%30==0?370:360
+
+x.beginPath()
+x.moveTo(Math.cos(a)*r1,Math.sin(a)*r1)
+x.lineTo(Math.cos(a)*r2,Math.sin(a)*r2)
+x.stroke()
+
+if(i%90==0){
+x.fillText(i+"°",Math.cos(a)*390,Math.sin(a)*390)
+}
 }
 
-ctx.save()
-
-// ⭐ 唯一正确变换
-ctx.translate(450,450)
-ctx.scale(scale,scale)
-ctx.rotate(rotation)
-ctx.translate(-450,-450)
-
-// ⭐ 所有图形在同一坐标系
+// ===== 罗盘 =====
 let inner=80
 
-// 中心圈（和其他圈完全一致）
-ctx.beginPath()
-ctx.arc(450,450,inner,0,Math.PI*2)
-ctx.strokeStyle="#000"
-ctx.stroke()
-
-state.layers.forEach(l=>{
-let outer=inner + l.w
+state.layers.forEach((l,li)=>{
+let outer=inner+l.w
 let arr=l.data.split(",")
-let step=Math.PI*2/l.n
-
-ctx.strokeStyle="rgba(0,0,0,0.7)"
-ctx.fillStyle=l.color
-ctx.font=l.size+"px serif"
+let step=2*Math.PI/l.n
 
 for(let i=0;i<l.n;i++){
-let a=i*step-Math.PI/2
+let a=i*step
+
+// 高亮选中
+if(selected && selected.layer===li && selected.index===i){
+x.fillStyle="rgba(255,0,0,0.2)"
+x.beginPath()
+x.arc(0,0,outer,a,a+step)
+x.arc(0,0,inner,a+step,a,true)
+x.fill()
+}
 
 // 分割线
-ctx.beginPath()
-ctx.moveTo(450+Math.cos(a)*inner,450+Math.sin(a)*inner)
-ctx.lineTo(450+Math.cos(a)*outer,450+Math.sin(a)*outer)
-ctx.stroke()
+x.beginPath()
+x.moveTo(Math.cos(a)*inner,Math.sin(a)*inner)
+x.lineTo(Math.cos(a)*outer,Math.sin(a)*outer)
+x.stroke()
 
 // 文字
 let mid=(inner+outer)/2
-let tx=450+Math.cos(a+step/2)*mid
-let ty=450+Math.sin(a+step/2)*mid
-
-let angle=a+step/2
-if(angle>Math.PI/2 && angle<Math.PI*1.5){
-angle+=Math.PI
+x.save()
+x.translate(Math.cos(a+step/2)*mid,Math.sin(a+step/2)*mid)
+x.rotate(a+step/2+Math.PI/2)
+x.fillText(arr[i]||"",0,0)
+x.restore()
 }
 
-ctx.save()
-ctx.translate(tx,ty)
-ctx.rotate(angle+Math.PI/2)
-ctx.textAlign="center"
-ctx.textBaseline="middle"
-ctx.fillText(arr[i]||"",0,0)
-ctx.restore()
-}
-
-// 圆环
-ctx.beginPath()
-ctx.arc(450,450,outer,0,Math.PI*2)
-ctx.stroke()
+x.beginPath()
+x.arc(0,0,outer,0,Math.PI*2)
+x.stroke()
 
 inner=outer
 })
 
-ctx.restore()
+x.restore()
 }
 
-// 主循环
-function draw(){
-requestAnimationFrame(draw)
-x.clearRect(0,0,900,900)
-drawCompass(x,false)
-}
 draw()
 
-// ===== 导出透明 =====
 function exportPNG(){
-let temp=document.createElement("canvas")
-temp.width=900
-temp.height=900
-let tx=temp.getContext("2d")
-
-drawCompass(tx,true)
-
+let url=c.toDataURL()
 let a=document.createElement("a")
-a.href=temp.toDataURL("image/png")
+a.href=url
 a.download="罗盘.png"
 a.click()
 }
