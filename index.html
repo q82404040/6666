@@ -8,6 +8,8 @@ body{margin:0;display:flex;height:100vh;background:#1e1e1e;font-family:sans-seri
 .panel{width:300px;background:#2b2b2b;padding:10px;color:#fff;overflow:auto}
 .btn{width:100%;padding:8px;margin:4px 0;background:#444;border:none;color:#fff;border-radius:6px}
 
+textarea{width:100%;margin-top:5px;background:#222;color:#fff;border:1px solid #555}
+
 .palette{display:flex;gap:6px;margin:6px 0}
 .color{width:20px;height:20px;border-radius:4px;cursor:pointer;border:2px solid #666}
 
@@ -40,8 +42,9 @@ c.height=900
 const palette=["#000","#c0392b","#2980b9","#27ae60","#f39c12","#8e44ad"]
 
 let scale=1
+let offsetX=0
+let offsetY=0
 
-// 👉 旋转
 let r=0
 let dragging=false
 let lastAngle=0
@@ -76,13 +79,15 @@ box.innerHTML+=`
 <input value="${l.w}" onchange="updateLayer(${i},'w',this.value)">
 
 <div class="palette">${colorsHTML}</div>
+
+<textarea onchange="updateLayer(${i},'data',this.value)">${l.data}</textarea>
 </div>
 `
 })
 }
 
 function updateLayer(i,key,val){
-state.layers[i][key]=Number(val)
+state.layers[i][key]=key==="data"?val:Number(val)
 }
 
 function setColor(i,col){
@@ -101,13 +106,22 @@ buildUI()
 
 buildUI()
 
-// 👉 缩放
+// ✅ 缩放（围绕鼠标）
 c.onwheel=e=>{
 e.preventDefault()
-scale*= e.deltaY<0 ? 1.1 : 0.9
+
+let mx=e.offsetX
+let my=e.offsetY
+
+let zoom = e.deltaY<0 ? 1.1 : 0.9
+
+offsetX = mx - (mx - offsetX)*zoom
+offsetY = my - (my - offsetY)*zoom
+
+scale*=zoom
 }
 
-// 👉 旋转（恢复）
+// 旋转
 c.onmousedown=e=>{
 dragging=true
 lastAngle=Math.atan2(e.offsetY-450,e.offsetX-450)
@@ -124,20 +138,21 @@ lastAngle=a
 // 绘制
 function drawCompass(ctx,transparent=false){
 
-// 白底（显示用）
 if(!transparent){
 ctx.fillStyle="#fff"
 ctx.fillRect(0,0,900,900)
 }
 
-// 👉 中心圈（修复）
+// 中心圈
 ctx.beginPath()
 ctx.arc(450,450,80,0,Math.PI*2)
-ctx.strokeStyle="#000"
 ctx.stroke()
 
 ctx.save()
+
+ctx.translate(offsetX,offsetY)
 ctx.translate(450,450)
+ctx.scale(scale,scale)
 ctx.rotate(r)
 ctx.translate(-450,-450)
 
@@ -155,13 +170,11 @@ ctx.font=l.size+"px serif"
 for(let i=0;i<l.n;i++){
 let a=i*step-Math.PI/2
 
-// 分割线
 ctx.beginPath()
 ctx.moveTo(450+Math.cos(a)*inner,450+Math.sin(a)*inner)
 ctx.lineTo(450+Math.cos(a)*outer,450+Math.sin(a)*outer)
 ctx.stroke()
 
-// 文字
 let mid=(inner+outer)/2
 let tx=450+Math.cos(a+step/2)*mid
 let ty=450+Math.sin(a+step/2)*mid
@@ -180,7 +193,6 @@ ctx.fillText(arr[i]||"",0,0)
 ctx.restore()
 }
 
-// 圆环
 ctx.beginPath()
 ctx.arc(450,450,outer,0,Math.PI*2)
 ctx.stroke()
@@ -199,7 +211,7 @@ drawCompass(x,false)
 }
 draw()
 
-// 导出透明
+// 导出
 function exportPNG(){
 let temp=document.createElement("canvas")
 temp.width=900
