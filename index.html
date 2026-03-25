@@ -5,14 +5,13 @@
 <style>
 body{margin:0;display:flex;height:100vh;background:#1e1e1e;font-family:sans-serif}
 
-.panel{width:300px;background:#2b2b2b;padding:10px;color:#fff}
+.panel{width:300px;background:#2b2b2b;padding:10px;color:#fff;overflow:auto}
 .btn{width:100%;padding:8px;margin:4px 0;background:#444;border:none;color:#fff;border-radius:6px}
 
 .palette{display:flex;gap:6px;margin:6px 0}
-.color{width:20px;height:20px;border-radius:4px;cursor:pointer;border:2px solid #555}
+.color{width:20px;height:20px;border-radius:4px;cursor:pointer;border:2px solid #666}
 
 .canvasBox{flex:1;display:flex;align-items:center;justify-content:center}
-canvas{background:#fff} /* 显示白底 */
 </style>
 </head>
 
@@ -21,12 +20,11 @@ canvas{background:#fff} /* 显示白底 */
 <div class="panel">
 <h3>罗盘工具</h3>
 
-<button class="btn" onclick="addLayer()">添加层</button>
+<button class="btn" onclick="addLayer()">➕ 添加层</button>
 
 <div id="layersUI"></div>
 
 <button class="btn" onclick="exportPNG()">导出透明PNG</button>
-
 </div>
 
 <div class="canvasBox">
@@ -43,6 +41,11 @@ const palette=["#000","#c0392b","#2980b9","#27ae60","#f39c12","#8e44ad"]
 
 let scale=1
 
+// 👉 旋转
+let r=0
+let dragging=false
+let lastAngle=0
+
 let state={
 layers:[
 {n:8,data:"乾,兑,离,震,巽,坎,艮,坤",size:18,color:"#000",w:60},
@@ -56,44 +59,86 @@ let box=document.getElementById("layersUI")
 box.innerHTML=""
 
 state.layers.forEach((l,i)=>{
-let colors=palette.map(col=>
-`<div class="color" style="background:${col}" onclick="state.layers[${i}].color='${col}'"></div>`
-).join("")
+let colorsHTML=""
+palette.forEach(col=>{
+colorsHTML+=`<div class="color" style="background:${col}" onclick="setColor(${i},'${col}')"></div>`
+})
 
 box.innerHTML+=`
-<div style="background:#333;padding:6px;margin:6px 0;border-radius:6px">
-第${i+1}层
-分割 <input value="${l.n}" onchange="state.layers[${i}].n=this.value">
-厚度 <input value="${l.w}" onchange="state.layers[${i}].w=this.value">
-<div class="palette">${colors}</div>
+<div style="background:#333;padding:8px;margin:8px 0;border-radius:6px">
+<b>第${i+1}层</b>
+<button onclick="removeLayer(${i})" style="float:right">✖</button>
+
+<br>分割
+<input value="${l.n}" onchange="updateLayer(${i},'n',this.value)">
+
+<br>厚度
+<input value="${l.w}" onchange="updateLayer(${i},'w',this.value)">
+
+<div class="palette">${colorsHTML}</div>
 </div>
 `
 })
 }
-buildUI()
+
+function updateLayer(i,key,val){
+state.layers[i][key]=Number(val)
+}
+
+function setColor(i,col){
+state.layers[i].color=col
+}
 
 function addLayer(){
 state.layers.push({n:12,data:"",size:12,color:"#000",w:50})
 buildUI()
 }
 
-// 缩放
-c.onwheel=e=>{
-e.preventDefault()
-scale *= e.deltaY<0 ? 1.1 : 0.9
+function removeLayer(i){
+state.layers.splice(i,1)
+buildUI()
 }
 
-// 👉 核心绘制函数（可复用）
-function drawCompass(ctx, transparent=false){
+buildUI()
 
+// 👉 缩放
+c.onwheel=e=>{
+e.preventDefault()
+scale*= e.deltaY<0 ? 1.1 : 0.9
+}
+
+// 👉 旋转（恢复）
+c.onmousedown=e=>{
+dragging=true
+lastAngle=Math.atan2(e.offsetY-450,e.offsetX-450)
+}
+window.onmouseup=()=>dragging=false
+
+window.onmousemove=e=>{
+if(!dragging)return
+let a=Math.atan2(e.offsetY-450,e.offsetX-450)
+r+=a-lastAngle
+lastAngle=a
+}
+
+// 绘制
+function drawCompass(ctx,transparent=false){
+
+// 白底（显示用）
 if(!transparent){
 ctx.fillStyle="#fff"
 ctx.fillRect(0,0,900,900)
 }
 
+// 👉 中心圈（修复）
+ctx.beginPath()
+ctx.arc(450,450,80,0,Math.PI*2)
+ctx.strokeStyle="#000"
+ctx.stroke()
+
 ctx.save()
 ctx.translate(450,450)
-ctx.scale(scale,scale)
+ctx.rotate(r)
 ctx.translate(-450,-450)
 
 let inner=80
@@ -103,18 +148,20 @@ let outer=inner+l.w
 let arr=l.data.split(",")
 let step=Math.PI*2/l.n
 
-ctx.strokeStyle="rgba(0,0,0,0.6)"
+ctx.strokeStyle="rgba(0,0,0,0.7)"
 ctx.fillStyle=l.color
 ctx.font=l.size+"px serif"
 
 for(let i=0;i<l.n;i++){
 let a=i*step-Math.PI/2
 
+// 分割线
 ctx.beginPath()
 ctx.moveTo(450+Math.cos(a)*inner,450+Math.sin(a)*inner)
 ctx.lineTo(450+Math.cos(a)*outer,450+Math.sin(a)*outer)
 ctx.stroke()
 
+// 文字
 let mid=(inner+outer)/2
 let tx=450+Math.cos(a+step/2)*mid
 let ty=450+Math.sin(a+step/2)*mid
@@ -133,6 +180,7 @@ ctx.fillText(arr[i]||"",0,0)
 ctx.restore()
 }
 
+// 圆环
 ctx.beginPath()
 ctx.arc(450,450,outer,0,Math.PI*2)
 ctx.stroke()
@@ -143,22 +191,22 @@ inner=outer
 ctx.restore()
 }
 
-// 主绘制
+// 主循环
 function draw(){
 requestAnimationFrame(draw)
 x.clearRect(0,0,900,900)
-drawCompass(x,false) // 显示用（白底）
+drawCompass(x,false)
 }
 draw()
 
-// 👉 真透明导出（关键修复）
+// 导出透明
 function exportPNG(){
 let temp=document.createElement("canvas")
 temp.width=900
 temp.height=900
 let tx=temp.getContext("2d")
 
-drawCompass(tx,true) // 不画白底
+drawCompass(tx,true)
 
 let a=document.createElement("a")
 a.href=temp.toDataURL("image/png")
