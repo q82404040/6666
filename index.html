@@ -3,17 +3,61 @@
 <head>
 <meta charset="utf-8">
 <style>
-body{margin:0;display:flex;height:100vh;background:#1e1e1e;font-family:sans-serif}
+body{
+margin:0;
+display:flex;
+height:100vh;
+background:#1e1e1e;
+font-family:sans-serif;
+}
 
-.panel{width:300px;background:#2b2b2b;padding:10px;color:#fff;overflow:auto}
-.btn{width:100%;padding:8px;margin:4px 0;background:#444;border:none;color:#fff;border-radius:6px}
+.panel{
+width:300px;
+background:#2b2b2b;
+padding:10px;
+color:#fff;
+overflow:auto;
+}
 
-textarea{width:100%;margin-top:5px;background:#222;color:#fff;border:1px solid #555}
+.btn{
+width:100%;
+padding:8px;
+margin:4px 0;
+background:#444;
+border:none;
+color:#fff;
+border-radius:6px;
+cursor:pointer;
+}
 
-.palette{display:flex;gap:6px;margin:6px 0}
-.color{width:20px;height:20px;border-radius:4px;cursor:pointer;border:2px solid #666}
+textarea{
+width:100%;
+margin-top:5px;
+background:#222;
+color:#fff;
+border:1px solid #555;
+}
 
-.canvasBox{flex:1;display:flex;align-items:center;justify-content:center}
+.palette{
+display:flex;
+gap:6px;
+margin:6px 0;
+}
+
+.color{
+width:20px;
+height:20px;
+border-radius:4px;
+cursor:pointer;
+border:2px solid #666;
+}
+
+.canvasBox{
+flex:1;
+display:flex;
+align-items:center;
+justify-content:center;
+}
 </style>
 </head>
 
@@ -42,7 +86,8 @@ c.height=900
 const palette=["#000","#c0392b","#2980b9","#27ae60","#f39c12","#8e44ad"]
 
 let scale=1
-let r=0
+let rotation=0
+
 let dragging=false
 let lastAngle=0
 
@@ -53,7 +98,7 @@ layers:[
 ]
 }
 
-// UI
+// ===== UI =====
 function buildUI(){
 let box=document.getElementById("layersUI")
 box.innerHTML=""
@@ -84,11 +129,11 @@ box.innerHTML+=`
 }
 
 function updateLayer(i,key,val){
-state.layers[i][key]=key==="data"?val:Number(val)
+state.layers[i][key] = key==="data" ? val : Number(val)
 }
 
 function setColor(i,col){
-state.layers[i].color=col
+state.layers[i].color = col
 }
 
 function addLayer(){
@@ -103,53 +148,54 @@ buildUI()
 
 buildUI()
 
-// ✅ 中心缩放（正确版）
+// ===== 缩放（中心）=====
 c.onwheel=e=>{
 e.preventDefault()
 scale *= e.deltaY<0 ? 1.1 : 0.9
 }
 
-// ✅ 旋转
+// ===== 旋转 =====
 c.onmousedown=e=>{
 dragging=true
 lastAngle=Math.atan2(e.offsetY-450,e.offsetX-450)
 }
+
 window.onmouseup=()=>dragging=false
 
 window.onmousemove=e=>{
 if(!dragging)return
 let a=Math.atan2(e.offsetY-450,e.offsetX-450)
-r+=a-lastAngle
-lastAngle=a
+rotation += a - lastAngle
+lastAngle = a
 }
 
-// 绘制核心
+// ===== 绘制 =====
 function drawCompass(ctx,transparent=false){
 
-// 白底（显示用）
 if(!transparent){
-ctx.fillStyle="#fff"
+ctx.fillStyle="#ffffff"
 ctx.fillRect(0,0,900,900)
 }
 
-// 中心圈
+ctx.save()
+
+// ⭐ 唯一正确变换
+ctx.translate(450,450)
+ctx.scale(scale,scale)
+ctx.rotate(rotation)
+ctx.translate(-450,-450)
+
+// ⭐ 所有图形在同一坐标系
+let inner=80
+
+// 中心圈（和其他圈完全一致）
 ctx.beginPath()
-ctx.arc(450,450,80,0,Math.PI*2)
+ctx.arc(450,450,inner,0,Math.PI*2)
 ctx.strokeStyle="#000"
 ctx.stroke()
 
-ctx.save()
-
-// ✅ 正确变换顺序（核心）
-ctx.translate(450,450)
-ctx.scale(scale,scale)
-ctx.rotate(r)
-ctx.translate(-450,-450)
-
-let inner=80
-
 state.layers.forEach(l=>{
-let outer=inner+l.w
+let outer=inner + l.w
 let arr=l.data.split(",")
 let step=Math.PI*2/l.n
 
@@ -204,7 +250,7 @@ drawCompass(x,false)
 }
 draw()
 
-// 导出透明
+// ===== 导出透明 =====
 function exportPNG(){
 let temp=document.createElement("canvas")
 temp.width=900
