@@ -4,7 +4,7 @@
 
 <div style="width:320px;background:#fff;padding:10px;border-right:1px solid #ddd;height:100vh;overflow:auto">
 
-<h3>罗盘工具</h3>
+<h3>陆压罗盘</h3>
 
 <button onclick="addLayer()" style="width:100%">➕ 添加层</button>
 
@@ -26,7 +26,6 @@ const x=c.getContext("2d")
 c.width=800
 c.height=800
 
-// 每层厚度（核心）
 const layerWidth = 40
 
 let state={
@@ -36,19 +35,16 @@ layers:[
 ]
 }
 
-// 添加层
 function addLayer(){
 state.layers.push({n:12,data:"",size:12,color:"#000"})
 buildUI()
 }
 
-// 删除层
 function removeLayer(i){
 state.layers.splice(i,1)
 buildUI()
 }
 
-// UI
 function buildUI(){
 const box=document.getElementById("layersUI")
 box.innerHTML=""
@@ -89,7 +85,6 @@ r+=v
 last=a
 }
 
-// 绘制（自动向外扩展）
 function draw(){
 requestAnimationFrame(draw)
 
@@ -97,14 +92,19 @@ if(!d){r+=v;v*=0.95}
 
 x.clearRect(0,0,800,800)
 
+// ✅ 画中心圈（修复消失问题）
+x.beginPath()
+x.arc(400,400,80,0,Math.PI*2)
+x.stroke()
+
 x.save()
 x.translate(400,400)
 x.rotate(r)
 x.translate(-400,-400)
 
-let inner = 80  // 起始半径
+let inner = 80
 
-state.layers.forEach((l,i)=>{
+state.layers.forEach(l=>{
 let outer = inner + layerWidth
 
 let arr=l.data.split(",")
@@ -114,10 +114,10 @@ x.strokeStyle="#000"
 x.fillStyle=l.color
 x.font=l.size+"px sans-serif"
 
-// 分割线
-for(let j=0;j<l.n;j++){
-let a=j*step-Math.PI/2
+for(let i=0;i<l.n;i++){
+let a=i*step-Math.PI/2
 
+// 分割线
 x.beginPath()
 x.moveTo(
 400+Math.cos(a)*inner,
@@ -129,17 +129,21 @@ x.lineTo(
 )
 x.stroke()
 
-// 文字
+// ✅ 文字朝向圆心（关键）
 let mid=(inner+outer)/2
 let tx=400+Math.cos(a+step/2)*mid
 let ty=400+Math.sin(a+step/2)*mid
 
+x.save()
+x.translate(tx,ty)
+x.rotate(a+step/2+Math.PI/2)
 x.textAlign="center"
 x.textBaseline="middle"
-x.fillText(arr[j]||"",tx,ty)
+x.fillText(arr[i]||"",0,0)
+x.restore()
 }
 
-// 圆环
+// 圆
 x.beginPath()
 x.arc(400,400,outer,0,Math.PI*2)
 x.stroke()
@@ -150,7 +154,6 @@ inner = outer
 x.restore()
 
 // 指针
-x.fillStyle="#000"
 x.beginPath()
 x.moveTo(400,60)
 x.lineTo(390,90)
@@ -164,17 +167,16 @@ x.fillText(deg.toFixed(1)+"°",400,420)
 
 draw()
 
-// 存储
 function save(){
 localStorage.setItem("tool",JSON.stringify(state))
 alert("已保存")
 }
+
 function load(){
 state=JSON.parse(localStorage.getItem("tool"))
 buildUI()
 }
 
-// 导出
 function exportImg(){
 let a=document.createElement("a")
 a.href=c.toDataURL()
