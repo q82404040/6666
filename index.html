@@ -4,20 +4,8 @@
 <meta charset="utf-8">
 <style>
 body{margin:0;display:flex;height:100vh;font-family:sans-serif;background:#1e1e1e;color:#eee}
-
-/* 面板 */
 .panel{width:320px;background:#2b2b2b;padding:10px;overflow:auto;border-right:1px solid #444}
 .btn{width:100%;padding:8px;margin:4px 0;background:#3a3a3a;border:none;color:#fff;border-radius:6px;cursor:pointer}
-.card{background:#333;padding:8px;margin-bottom:10px;border-radius:8px}
-
-/* 调色板 */
-.palette{display:flex;gap:6px;margin:5px 0}
-.colorBox{
-width:20px;height:20px;border-radius:4px;cursor:pointer;border:2px solid #555
-}
-.colorBox:hover{border:2px solid #fff}
-
-/* 画布 */
 .canvasBox{flex:1;display:flex;align-items:center;justify-content:center;background:#111}
 </style>
 </head>
@@ -25,17 +13,16 @@ width:20px;height:20px;border-radius:4px;cursor:pointer;border:2px solid #555
 <body>
 
 <div class="panel">
+<h3>配色系统</h3>
 
-<h3>罗盘设计工具</h3>
+<button class="btn" onclick="setTheme('classic')">传统风水</button>
+<button class="btn" onclick="setTheme('dark')">现代暗黑</button>
+
+<hr>
 
 <button class="btn" onclick="addLayer()">➕ 添加层</button>
 
 <div id="layersUI"></div>
-
-<hr>
-
-<button class="btn" onclick="save()">💾 保存</button>
-<button class="btn" onclick="load()">📂 读取</button>
 
 </div>
 
@@ -49,92 +36,87 @@ const x=c.getContext("2d")
 c.width=900
 c.height=900
 
-// 调色板
-const palette=["#000","#c0392b","#2980b9","#27ae60","#f39c12","#8e44ad"]
+let theme="classic"
 
 let state={
 layers:[
-{n:8,data:"乾,兑,离,震,巽,坎,艮,坤",size:18,color:"#000",w:60},
-{n:24,data:"子,癸,丑,艮,寅,甲,卯,乙,辰,巽,巳,丙,午,丁,未,坤,申,庚,酉,辛,戌,乾,亥,壬",size:12,color:"#000",w:50}
+{n:8,data:"乾,兑,离,震,巽,坎,艮,坤",size:18,w:60},
+{n:24,data:"子,癸,丑,艮,寅,甲,卯,乙,辰,巽,巳,丙,午,丁,未,坤,申,庚,酉,辛,戌,乾,亥,壬",size:12,w:50}
 ]
 }
 
-let hoverIndex=-1
+// 🎨 自动配色系统
+function getColor(i,total){
+if(theme==="classic"){
+let base=50 + i*(180/total)
+return `hsl(${base},60%,70%)`
+}else{
+let light=20 + i*(60/total)
+return `hsl(0,0%,${light}%)`
+}
+}
 
+// 自动文字颜色
+function getTextColor(bg){
+let temp=document.createElement("div")
+temp.style.color=bg
+document.body.appendChild(temp)
+let rgb=getComputedStyle(temp).color
+document.body.removeChild(temp)
+
+let nums=rgb.match(/\d+/g).map(Number)
+let brightness=(nums[0]*299+nums[1]*587+nums[2]*114)/1000
+return brightness<128 ? "#fff" : "#000"
+}
+
+// UI
 function buildUI(){
 const box=document.getElementById("layersUI")
 box.innerHTML=""
 
 state.layers.forEach((l,i)=>{
-let colorsHTML=palette.map(col=>
-`<div class="colorBox" style="background:${col}" onclick="setColor(${i},'${col}')"></div>`
-).join("")
-
 box.innerHTML+=`
-<div class="card">
-<b>第${i+1}层</b>
-<button onclick="removeLayer(${i})" style="float:right">✖</button>
-
-分割 <input value="${l.n}" onchange="state.layers[${i}].n=this.value">
-字体 <input value="${l.size}" onchange="state.layers[${i}].size=this.value">
-
-厚度 <input value="${l.w}" onchange="state.layers[${i}].w=this.value">
-
-<div class="palette">${colorsHTML}</div>
-
+<div style="background:#333;padding:8px;margin:10px 0;border-radius:8px">
+第${i+1}层
+<br>分割 <input value="${l.n}" onchange="state.layers[${i}].n=this.value">
+<br>厚度 <input value="${l.w}" onchange="state.layers[${i}].w=this.value">
+<br>文字
 <textarea onchange="state.layers[${i}].data=this.value">${l.data}</textarea>
 </div>
 `
 })
 }
 
-function setColor(i,col){
-state.layers[i].color=col
-}
+buildUI()
 
 function addLayer(){
-state.layers.push({n:12,data:"",size:12,color:"#000",w:50})
+state.layers.push({n:12,data:"",w:50,size:12})
 buildUI()
 }
 
-function removeLayer(i){
-state.layers.splice(i,1)
-buildUI()
+function setTheme(t){
+theme=t
 }
-
-buildUI()
 
 // 旋转
-let r=0,v=0,d=false,last=0
-
-c.onmousedown=e=>{
-d=true
-last=Math.atan2(e.offsetY-450,e.offsetX-450)
+let r=0
+c.onmousemove=e=>{
+if(e.buttons){
+r+=0.01
 }
-window.onmouseup=()=>d=false
-window.onmousemove=e=>{
-let mx=e.offsetX,my=e.offsetY
-
-// 👉 计算鼠标所在宫位（高亮）
-let dx=mx-450,dy=my-450
-let ang=Math.atan2(dy,dx)+Math.PI/2
-if(ang<0) ang+=Math.PI*2
-hoverIndex=ang
-
-if(!d)return
-let a=Math.atan2(my-450,mx-450)
-v=a-last
-r+=v
-last=a
 }
 
 // 绘制
 function draw(){
 requestAnimationFrame(draw)
 
-if(!d){r+=v;v*=0.95}
-
 x.clearRect(0,0,900,900)
+
+// 白底
+x.beginPath()
+x.arc(450,450,420,0,Math.PI*2)
+x.fillStyle="#fff"
+x.fill()
 
 x.save()
 x.translate(450,450)
@@ -144,34 +126,26 @@ x.translate(-450,-450)
 let inner=80
 
 state.layers.forEach((l,i)=>{
-let outer=inner+Number(l.w)
+let outer=inner+l.w
+
+let color=getColor(i,state.layers.length)
+let textColor=getTextColor(color)
+
+x.fillStyle=color
+x.beginPath()
+x.arc(450,450,outer,0,Math.PI*2)
+x.arc(450,450,inner,0,Math.PI*2,true)
+x.fill()
+
 let arr=l.data.split(",")
 let step=Math.PI*2/l.n
 
-x.strokeStyle="#000"
-x.fillStyle=l.color
+x.fillStyle=textColor
 x.font=l.size+"px serif"
 
 for(let j=0;j<l.n;j++){
 let a=j*step-Math.PI/2
 
-// 👉 高亮当前宫位
-if(hoverIndex>j*step && hoverIndex<(j+1)*step){
-x.fillStyle="rgba(255,0,0,0.2)"
-x.beginPath()
-x.moveTo(450,450)
-x.arc(450,450,outer,a,a+step)
-x.fill()
-x.fillStyle=l.color
-}
-
-// 分割
-x.beginPath()
-x.moveTo(450+Math.cos(a)*inner,450+Math.sin(a)*inner)
-x.lineTo(450+Math.cos(a)*outer,450+Math.sin(a)*outer)
-x.stroke()
-
-// 文字
 let mid=(inner+outer)/2
 let tx=450+Math.cos(a+step/2)*mid
 let ty=450+Math.sin(a+step/2)*mid
@@ -190,33 +164,13 @@ x.fillText(arr[j]||"",0,0)
 x.restore()
 }
 
-x.beginPath()
-x.arc(450,450,outer,0,Math.PI*2)
-x.stroke()
-
 inner=outer
 })
 
 x.restore()
-
-// 指针
-x.beginPath()
-x.moveTo(450,60)
-x.lineTo(440,100)
-x.lineTo(460,100)
-x.fill()
 }
 
 draw()
-
-function save(){
-localStorage.setItem("tool",JSON.stringify(state))
-alert("已保存")
-}
-function load(){
-state=JSON.parse(localStorage.getItem("tool"))
-buildUI()
-}
 </script>
 
 </body>
