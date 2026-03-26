@@ -4,62 +4,21 @@
 <meta charset="utf-8">
 <style>
 body{margin:0;display:flex;height:100vh;background:#1e1e1e;font-family:sans-serif}
-
-.panel{
-width:320px;
-background:#2b2b2b;
-padding:10px;
-color:#fff;
-overflow:auto;
-}
-
-.btn{
-width:100%;
-padding:8px;
-margin:4px 0;
-background:#444;
-border:none;
-color:#fff;
-border-radius:6px;
-cursor:pointer;
-}
-
-textarea{
-width:100%;
-margin-top:5px;
-background:#222;
-color:#fff;
-border:1px solid #555;
-}
-
-.palette{
-display:flex;
-gap:6px;
-margin:6px 0;
-}
-
-.color{
-width:20px;height:20px;border-radius:4px;cursor:pointer;border:2px solid #666
-}
-
-.canvasBox{
-flex:1;
-display:flex;
-align-items:center;
-justify-content:center;
-}
+.panel{width:320px;background:#2b2b2b;padding:10px;color:#fff;overflow:auto}
+.btn{width:100%;padding:8px;margin:4px 0;background:#444;border:none;color:#fff;border-radius:6px;cursor:pointer}
+textarea{width:100%;margin-top:5px;background:#222;color:#fff;border:1px solid #555}
+.palette{display:flex;gap:6px;margin:6px 0}
+.color{width:20px;height:20px;border-radius:4px;cursor:pointer;border:2px solid #666}
+.canvasBox{flex:1;display:flex;align-items:center;justify-content:center}
 </style>
 </head>
 
 <body>
 
 <div class="panel">
-<h3>罗盘工具（竖排版）</h3>
-
+<h3>罗盘工具（弧形排版版）</h3>
 <button class="btn" onclick="addLayer()">添加层</button>
-
 <div id="layersUI"></div>
-
 <button class="btn" onclick="exportPNG()">导出PNG</button>
 </div>
 
@@ -92,78 +51,34 @@ layers:[
 function buildUI(){
 let box=document.getElementById("layersUI")
 box.innerHTML=""
-
 state.layers.forEach((l,i)=>{
 let colors=""
 palette.forEach(col=>{
 colors+=`<div class="color" style="background:${col}" onclick="setColor(${i},'${col}')"></div>`
 })
-
 box.innerHTML+=`
 <div style="background:#333;padding:8px;margin:8px 0;border-radius:6px">
 <b>第${i+1}层</b>
 <button onclick="removeLayer(${i})" style="float:right">✖</button>
-
 <br>分割 <input value="${l.n}" onchange="updateLayer(${i},'n',this.value)">
 <br>厚度 <input value="${l.w}" onchange="updateLayer(${i},'w',this.value)">
-
 <div class="palette">${colors}</div>
-
 <textarea onchange="updateLayer(${i},'data',this.value)">${l.data}</textarea>
-</div>
-`
+</div>`
 })
 }
-
-function updateLayer(i,key,val){
-state.layers[i][key]=key==="data"?val:Number(val)
-}
-
-function setColor(i,col){
-state.layers[i].color=col
-}
-
-function addLayer(){
-state.layers.push({n:12,data:"",w:50,color:"#000"})
-buildUI()
-}
-
-function removeLayer(i){
-state.layers.splice(i,1)
-buildUI()
-}
-
+function updateLayer(i,key,val){state.layers[i][key]=key==="data"?val:Number(val)}
+function setColor(i,col){state.layers[i].color=col}
+function addLayer(){state.layers.push({n:12,data:"",w:50,color:"#000"});buildUI()}
+function removeLayer(i){state.layers.splice(i,1);buildUI()}
 buildUI()
 
-// ===== 竖排字号计算 =====
-function fitVerticalFont(ctx,chars,maxH,maxW){
-let size=maxH/chars.length
-while(size>5){
-ctx.font=size+"px serif"
-if(size*chars.length<=maxH && ctx.measureText(chars[0]||"字").width<=maxW){
-return size
-}
-size--
-}
-return size
-}
-
-// ===== 缩放 =====
-c.onwheel=e=>{
-e.preventDefault()
-scale*=e.deltaY<0?1.1:0.9
-}
-
-// ===== 旋转 =====
-c.onmousedown=e=>{
-rotating=true
-lastAngle=Math.atan2(e.offsetY-450,e.offsetX-450)
-}
-
+// ===== 交互 =====
+c.onwheel=e=>{e.preventDefault();scale*=e.deltaY<0?1.1:0.9}
+c.onmousedown=e=>{rotating=true;lastAngle=Math.atan2(e.offsetY-450,e.offsetX-450)}
 window.onmouseup=()=>rotating=false
-
 window.onmousemove=e=>{
-if(!rotating) return
+if(!rotating)return
 let a=Math.atan2(e.offsetY-450,e.offsetX-450)
 rotation+=a-lastAngle
 lastAngle=a
@@ -173,48 +88,35 @@ lastAngle=a
 c.onclick=e=>{
 let x=e.offsetX-450
 let y=e.offsetY-450
-
-let cos=Math.cos(-rotation)
-let sin=Math.sin(-rotation)
-let rx=x*cos-y*sin
-let ry=x*sin+y*cos
-
+let cos=Math.cos(-rotation),sin=Math.sin(-rotation)
+let rx=x*cos-y*sin,ry=x*sin+y*cos
 let dist=Math.sqrt(rx*rx+ry*ry)
 let angle=Math.atan2(ry,rx)
-if(angle<0) angle+=Math.PI*2
-
-let inner=80
-let found=false
-
+if(angle<0)angle+=Math.PI*2
+let inner=80,found=false
 state.layers.forEach((l,li)=>{
 let outer=inner+l.w
-if(dist>inner*scale && dist<outer*scale){
+if(dist>inner*scale&&dist<outer*scale){
 let step=2*Math.PI/l.n
 selected={layer:li,index:Math.floor(angle/step)}
-found=true
-}
-inner=outer
-})
-
-if(!found) selected=null
+found=true}
+inner=outer})
+if(!found)selected=null
 }
 
 // ===== 绘制 =====
 function draw(){
 requestAnimationFrame(draw)
 ctx.clearRect(0,0,900,900)
-
 ctx.fillStyle="#fff"
 ctx.fillRect(0,0,900,900)
 
 ctx.save()
-
 ctx.translate(450,450)
 ctx.scale(scale,scale)
 ctx.rotate(rotation)
 
 let inner=80
-
 ctx.beginPath()
 ctx.arc(0,0,inner,0,Math.PI*2)
 ctx.stroke()
@@ -224,44 +126,57 @@ let outer=inner+l.w
 let arr=l.data.split(",")
 let step=2*Math.PI/l.n
 
-ctx.fillStyle=l.color
-
 for(let i=0;i<l.n;i++){
 let a=i*step
+let mid=a+step/2
 
+// 高亮
 if(selected && selected.layer===li && selected.index===i){
 ctx.fillStyle="rgba(255,0,0,0.2)"
 ctx.beginPath()
 ctx.arc(0,0,outer,a,a+step)
 ctx.arc(0,0,inner,a+step,a,true)
 ctx.fill()
-ctx.fillStyle=l.color
 }
 
+// 分割线
+ctx.strokeStyle="#000"
 ctx.beginPath()
 ctx.moveTo(Math.cos(a)*inner,Math.sin(a)*inner)
 ctx.lineTo(Math.cos(a)*outer,Math.sin(a)*outer)
 ctx.stroke()
 
-// ===== 竖排文字 =====
+// ===== 真·弧形排版 =====
 let text=arr[i]||""
 let chars=text.split("")
-let mid=(inner+outer)/2
+let height=outer-inner
+let gap=height/(chars.length+1)
 
-let size=fitVerticalFont(ctx,chars,(outer-inner)*0.9,step*mid*0.9)
+// 字号
+let size=Math.min(gap*0.8, step*((inner+outer)/2)*0.6)
 ctx.font=size+"px serif"
-
-ctx.save()
-ctx.translate(Math.cos(a+step/2)*mid,Math.sin(a+step/2)*mid)
-ctx.rotate(a+step/2+Math.PI/2)
+ctx.fillStyle=l.color
 
 for(let j=0;j<chars.length;j++){
-ctx.fillText(chars[j],0,(j-chars.length/2)*size)
-}
+let r=inner+gap*(j+1)
+
+ctx.save()
+
+ctx.translate(Math.cos(mid)*r,Math.sin(mid)*r)
+
+// ⭐关键：字朝圆心
+ctx.rotate(mid+Math.PI/2)
+
+ctx.textAlign="center"
+ctx.textBaseline="middle"
+ctx.fillText(chars[j],0,0)
 
 ctx.restore()
 }
 
+}
+
+// 圈边
 ctx.beginPath()
 ctx.arc(0,0,outer,0,Math.PI*2)
 ctx.stroke()
