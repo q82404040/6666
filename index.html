@@ -16,7 +16,7 @@ textarea{width:100%;margin-top:5px;background:#222;color:#fff;border:1px solid #
 <body>
 
 <div class="panel">
-<h3>罗盘工具（高清最终版）</h3>
+<h3>罗盘工具（最终清晰版）</h3>
 <button class="btn" onclick="addLayer()">添加层</button>
 <div id="layersUI"></div>
 <button class="btn" onclick="exportPNG()">导出PNG</button>
@@ -30,7 +30,7 @@ textarea{width:100%;margin-top:5px;background:#222;color:#fff;border:1px solid #
 const c=document.getElementById("c")
 const ctx=c.getContext("2d")
 
-// ===== 高清关键 =====
+// ===== 高清 =====
 const DPR = window.devicePixelRatio || 1
 c.width = 900 * DPR
 c.height = 900 * DPR
@@ -158,18 +158,18 @@ ctx.moveTo(Math.cos(a)*inner,Math.sin(a)*inner)
 ctx.lineTo(Math.cos(a)*outer,Math.sin(a)*outer)
 ctx.stroke()
 
-// ===== 外→内弧形文字 =====
+// ===== 外→内弧形文字（优化版）=====
 let text=arr[i]||""
 let chars=text.split("")
 let height=outer-inner
 let gap=height/(chars.length+1)
 
-let size=Math.min(gap*0.8, step*((inner+outer)/2)*0.6)
+let size=Math.min(gap*0.85, step*((inner+outer)/2)*0.65)
 
-ctx.font="bold "+size+"px Microsoft YaHei, PingFang SC, Heiti SC, sans-serif"
+ctx.font=size+"px Microsoft YaHei, PingFang SC, Heiti SC, sans-serif"
 ctx.fillStyle=l.color
-ctx.strokeStyle=l.color
-ctx.lineWidth=size*0.08
+ctx.strokeStyle="rgba(0,0,0,0.35)"
+ctx.lineWidth=size*0.03
 
 for(let j=0;j<chars.length;j++){
 let r=outer-gap*(j+1)
